@@ -13,7 +13,7 @@ _dsnap_sync()
 	local cmd=${words[1]}
 
 	commands_comments='--description --label-finished --label-running --label-synced'
-	commands_generic='--batch --color --dry-run --help --noconfirm --nonotify --nopv --noionice --use-btrfs-quota --verbose --version'
+	commands_generic='--batch --color --dry-run --help --noconfirm --nonotify --nopv --noionice --nombuffer --use-btrfs-quota --verbose --version'
 	commands_sync='--automount --backupdir --backuptype --config --config-postfix '
 	commands_tape='--volumename --media-pool '
 	commands_target='--port --remote --subvolid --uuid --target'

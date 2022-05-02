@@ -57,6 +57,8 @@ color=0
 donotify=0
 dryrun=0
 do_pv_cmd=0
+do_mbuffer=0
+mbuffer_cmd=0
 #disk_count=-1
 disk_uuid_match_count=0
 #disk_target_match_count=0
@@ -113,6 +115,7 @@ check_prerequisites () {
     which pv >/dev/null 2>&1 && { do_pv_cmd=1; }
     which tape-admin >/dev/null 2>&1 && { tape_admin_cmd=1; }
     which nc >/dev/null 2>&1 && { nc_cmd=1; }
+    which mbuffer >/dev/null 2>&1 && { mbuffer_cmd=1; }
 
     if [ $(id -u) -ne 0 ] ; then printf "$progname: must be run as root\n" ; exit 1 ; fi
 
@@ -1001,6 +1004,10 @@ parse_params () {
 		do_ionice_cmd=0
 		shift 1
 		;;
+	    --nombuffer)
+		do_mbuffer=0
+		shift 1
+		;;
 	    -p|--port)
 		port=$2
 		shift 2
@@ -1685,13 +1692,23 @@ run_backup () {
 	    cmd_ionice=''
 	fi
 
-	# settings for interactive progress status
+	# settings for interactive progress status and mbuffer
 	if [ $do_pv_cmd -eq 1 ]; then
-	    pv_options="--delay-start 2  --interval 5 --format \"time elapsed [%t] | avg rate %a | rate %r | transmitted [%b] | %p | time remaining [%e]\" "
-	    cmd_pv="pv --size $snapper_source_snapshot_size $pv_options | "
-	    #cmd_pv="pv $pv_options --size ${snapper_source_snapshot_size} | dialog --gauge \"$progname: Progress for config '$selected_config'\" 6 85 |"
+	    if [ $do_mbuffer -eq 1 && $mbuffer_cmd -eq 1]; then
+		$mbuffer_options="-m 1G -v 3"
+		cmd_pv="mbuffer $mbuffer_options | "
+	    else 
+		pv_options="--delay-start 1  --interval 3 --format \"time elapsed [%t] | avg rate %a | rate %r | transmitted [%b] | %p | time remaining [%e]\" "
+		cmd_pv="pv --size $snapper_source_snapshot_size $pv_options | "
+		#cmd_pv="pv $pv_options --size ${snapper_source_snapshot_size} | dialog --gauge \"$progname: Progress for config '$selected_config'\" 6 85 |"
+	    fi
 	else
-	    cmd_pv=''
+	    if [ $do_mbuffer -eq 1 && $mbuffer_cmd -eq 1]; then
+		$mbuffer_options="-m 1G -q -v 0"
+		cmd_pv="mbuffer $mbuffer_options | "
+	    else 
+		cmd_pv=''
+	    fi
 	fi
 
 	case $selected_fstype in
@@ -2679,6 +2696,7 @@ Options:
      --nonotify              Disable graphical notification (via dbus)
      --nopv                  Disable graphical progress output (disable pv)
      --noionice              Disable setting of I/O class and priority options on target
+     --nombuffer             Disable use of mbuffer
  -p, --port <port>           The remote port
  -r, --remote <address>      Send the snapshot backup to a remote machine. The snapshot will be sent via ssh
                              You should specify the remote machine's hostname or ip address. The 'root' user
