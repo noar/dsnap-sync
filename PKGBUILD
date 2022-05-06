@@ -1,7 +1,7 @@
 # Maintainer: No ar <spadrolelavie at gmail dot com>
 # Arch repackage forked from Ralf Zerres <ralf.zerres.de at gmail dot com>
 pkgname=dsnap-sync
-pkgver=0.6.5
+pkgver=0.6.6-beta3
 pkgrel=1
 pkgdesc="Use snapper snapshots to backup to external drive"
 arch=(any)
