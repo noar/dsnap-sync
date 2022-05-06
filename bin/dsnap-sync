@@ -1694,7 +1694,7 @@ run_backup () {
 
 	# settings for interactive progress status and mbuffer
 	if [ $do_pv_cmd -eq 1 ]; then
-	    if [ $do_mbuffer -eq 1 && $mbuffer_cmd -eq 1]; then
+	    if [ $do_mbuffer -eq 1 ] && [ $mbuffer_cmd -eq 1]; then
 		$mbuffer_options="-m 1G -v 3"
 		cmd_pv="mbuffer $mbuffer_options | "
 	    else 
@@ -1703,7 +1703,7 @@ run_backup () {
 		#cmd_pv="pv $pv_options --size ${snapper_source_snapshot_size} | dialog --gauge \"$progname: Progress for config '$selected_config'\" 6 85 |"
 	    fi
 	else
-	    if [ $do_mbuffer -eq 1 && $mbuffer_cmd -eq 1]; then
+	    if [ $do_mbuffer -eq 1 ] && [ $mbuffer_cmd -eq 1]; then
 		$mbuffer_options="-m 1G -q -v 0"
 		cmd_pv="mbuffer $mbuffer_options | "
 	    else 
