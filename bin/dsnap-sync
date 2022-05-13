@@ -65,7 +65,6 @@ disk_uuid_match_count=0
 disk_subvolid_match_count=0
 disk_uuid_match=''
 error_count=0
-ltfs_mountpoint="/media/tape"
 target_count=0
 target_match_count=0
 tape_match=''
@@ -83,7 +82,6 @@ snapper_backup_type='none'
 snapper_config_postfix=
 snap_cleanup_algorithm="timeline"
 verbose=0
-volume_name=
 
 # ascii color
 BLUE=
@@ -113,7 +111,7 @@ check_prerequisites () {
     which ionice >/dev/null 2>&1 && { do_ionice_cmd=1; }
     which notify-send >/dev/null 2>&1 && { donotify=1; }
     which pv >/dev/null 2>&1 && { do_pv_cmd=1; }
-    which tape-admin >/dev/null 2>&1 && { tape_admin_cmd=1; }
+###    which tape-admin >/dev/null 2>&1 && { tape_admin_cmd=1; }
     which nc >/dev/null 2>&1 && { nc_cmd=1; }
     which mbuffer >/dev/null 2>&1 && { mbuffer_cmd=1; }
 
@@ -277,32 +275,6 @@ get_archive_last_sync_id () {
 	fi
     fi
 
-    # target is LTFS tape
-    if [ ${#volume_name} -gt 1 ]; then
-	case ${archive_type} in
-	    #incremental)
-	    #	cmd="find ${selected_target}/${backupdir}/${snapper_target_config} -name *_${archive_type}.btrfs \
-    	    #  	    | awk -F '.*/'  '{ gsub(/_${archive_type}.btrfs\$/,"_"); print \$2}' \
-	    #       | awk ' \$1 == $snapper_source_sync_id {print \$1} ' "
-	    #	;;
-	    *)
-	        cmd="find ${selected_target}/${backupdir}/${snapper_target_config} -name *_${archive_type}.btrfs \
-    	       	    | awk -F '.*/'  '{ gsub(/_${archive_type}.btrfs\$/,"_"); cnt++} END {print cnt}'"
-		ret=$(eval $run_ssh "$cmd" 2>/dev/null)
-		if [ ${#ret} -ge 1 ]; then
-		    if [ $verbose -ge 3 ]; then
-			printf "${MAGENTA}Found ${GREEN}'%s'${MAGENTA} previous synced archives for config ${GREEN}'%s'${NO_COLOR}\n" \
-			       "${ret}" "$selected_config"
-		    fi
-		    # get last sync-id
-		    cmd="find ${selected_target}/${backupdir}/${snapper_target_config} -name *_${archive_type}.btrfs \
-    	       	    	      | awk -F '.*/'  '{ gsub(/_${archive_type}.btrfs\$/,"_") } END {print \$2}'"
-		else
-		    return 1
-		fi
-		;;
-	esac
-    fi
 
     ret=$(eval $run_ssh "$cmd" 2>/dev/null)
     if [ ${#ret} -ge 1 ]; then
@@ -345,44 +317,7 @@ get_backupdir () {
     fi
 }
 
-get_media_infos () {
-    # select the target LTFS tape
-    if [ ${#mediapool_name} -gt 1 ] || [ ${#volume_name} -gt 1 ]; then
-	# read mounted LTFS structures
-	if [ -z $remote ]; then
-	    tape-admin --verbose=$verbose --mount ${mediapool_name} ${volume_name}
-	else
-	    $ssh tape-admin --version
-	    $ssh tape-admin --verbose=$verbose --mount ${mediapool_name} ${volume_name}
-	fi
-	if [ $? -eq 0 ]; then
-	    target_cmdline=$ltfs_mountpoint
-	    if  [ ${#volume_name} -eq 0 ]; then
-		# parse out volume-name (fuse - extended attribute)
-		volume_name=$($ssh attr -g ltfs.volumeName $ltfs_mountpoint)
-		volume_name=$(echo ${volume_name##*:} | sed -e 's/\r\n//g')
-	    fi
-	    get_tape_infos
-	    if [ $? -ne 0 ]; then
-		printf "${RED}Error: ${NO_COLOR}Can't use valid volume from MediaPool ${GREEN}'%s'${NO_COLOR}\n" \
-		   "$mediapool_name"
-		die "Can't use valid tape."
-	    fi
-	else
-	    if [ ${#volume_name} -gt 0 ]; then
-		printf "${RED}Error: ${NO_COLOR}Can't use volume ${GREEN}'%s'${NO_COLOR} from MediaPool ${GREEN}'%s'${NO_COLOR}\n" \
-		   "$volume_name" "$mediapool_name"
-	    else
-		printf "${RED}Error: ${NO_COLOR}Can't use valid volume from MediaPool ${GREEN}'%s'${NO_COLOR}\n" \
-		   "$mediapool_name"
-	    fi
-	    die "Can't use valid tape."
-	fi
-    else
-	# read mounted BTRFS structures
-	get_disk_infos
-    fi
-}
+
 
 get_snapper_backup_type () {
     local snapper_config=$1
@@ -658,6 +593,7 @@ get_disk_infos () {
     done
 }
 
+: <<'notapesupport'
 get_tape_infos () {
     local tape_id
     local tape_target
@@ -740,6 +676,7 @@ get_tape_infos () {
 	i=$((i+1))
     done
 }
+notapesupport
 
 get_snapper_last_sync_id () {
     local snapper_config=${1#snapper_config=}
@@ -984,10 +921,6 @@ parse_params () {
 		donotify=0
 		shift
 		;;
-	    --mediapool)
-		mediapool_name="$2"
-		shift 2
-		;;
 	    --mode)
 		backup_mode="$2"
 		shift 2
@@ -1113,10 +1046,7 @@ parse_params () {
 		    break
 		fi
 		;;
-	    --mediapool=*)
-		mediapool_name=${1#*=}
-		shift
-		;;
+#Checkwhyduplicate
 	    --mode=*)
 		backup_mode=${1#*=}
 		shift
@@ -1143,10 +1073,6 @@ parse_params () {
 		;;
 	    --v=* | --verbose=*)
 		verbose=${1#*=}
-		shift
-		;;
-	    --volumename=*)
-		volume_name=${1#*=}
 		shift
 		;;
 	    --) # End of all options
@@ -1227,8 +1153,10 @@ parse_params () {
 	printf "for backup-target:\n"
 	printf "  disk UUID:        '%s'\n" "$uuid_cmdline"
 	printf "  disk SUBVOLID:    '%s'\n" "$subvolid_cmdline"
+: <<'notapesupport'
 	printf "  tape MediaPool:   '%s'\n" "$mediapool_name"
 	printf "  tape VolumeName:  '%s'\n" "$volume_name"
+notapesupport
 	printf "  TARGET name:      '%s'\n" "$target_cmdline"
 	printf "  Backupdir:        '%s'\n" "$backupdir_cmdline"
 	printf "  Backup Type:      '%s'\n" "$backuptype_cmdline"
@@ -2070,13 +1998,7 @@ run_finalize () {
 			printf "return: '%s'\n" "$?"
 		    fi
 		    sync
-
-		    # update tape attributes
-		    if [ ${#mediapool_name} -gt 1 ] && [ ${#volume_name} -gt 1 ]; then
-			# read mounted LTFS structures
-			$ssh tape-admin --verbose=$verbose --update-lastwrite ${mediapool_name} ${volume_name}
-			$ssh tape-admin --verbose=$verbose --update-retensiondate ${mediapool_name} ${volume_name}
-		    fi
+		    
 		fi
 		return 0
 		;;
@@ -2342,8 +2264,8 @@ select_target () {
 		 printf "${MAGENTA}You selected %s target with UUID ${GREEN}'%s'${MAGENTA} (subvolid=${GREEN}'%s'${MAGENTA})${NO_COLOR}.\n" \
 			"$selected_fstype" "$selected_uuid" "$selected_subvol"
 		 ;;
-	     ltfs)
-		 printf "${MAGENTA}You selected %s target (VolumeName=${GREEN}'%s'${MAGENTA})${NO_COLOR}.\n" \
+	     *)
+		 printf "${MAGENTA}You selected a target with a/an %s filesystem type. NOTE LTFS IS DISABLED IN THIS VERSION (VolumeName=${GREEN}'%s'${MAGENTA})${NO_COLOR}.\n" \
 			"$selected_fstype" "$volume_name"
 		 ;;
 	esac
@@ -2510,137 +2432,6 @@ select_target_disk () {
     fi
 }
 
-select_target_tape () {
-    local i=0
-    local tape_id=0
-
-    local tape_selected_count=0
-    local subvolid=''
-    local subvol=''
-
-    if [ $verbose -ge 1 ]; then
-	printf "${BLUE}Select target tape...${NO_COLOR}\n"
-    fi
-
-    # print selection table
-    if [ $verbose -ge 2 ]; then
-	if [ -z "$remote" ]; then
-            printf "Selecting a mounted LTFS tape for backups on your local machine.\n"
-	else
-            printf "Selecting a mounted LTFS tape for backups on %s.\n" "$remote"
-	fi
-    fi
-    while [ "$tape_id" -eq -1 ] || [ "$tape_id" -le $tape_count ]; do
-	if [ "$tape_match_count" -eq 1 ]; then
-	    # matching LTFS selection from commandline
-	    # Pseudo-Array: tape_selected_$i (reference to $tape_uuid element)
-	    eval "tape_selected_$i='$tape_id_match'"
-	    tape=$(eval echo \$tape_id_$tape_id_match)
-	    #subvolid=$(eval echo \$tape_id_$tape_id_match)
-	    #fs_options=$(eval echo \$tape_fs_options_$tape_id_match | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
-	    tape_selected=$tape_id_match
-	    break
-	fi
-	if [ "$tape_target_match_count" -eq 1 ]; then
-	    # matching TARGET selection from commandline
-	    # Pseudo-Array: tape_selected_$i (reference to $tape_id element)
-	    eval "tape_selected_$i='$tape_target_match'"
-	    tape=$(eval echo \$tape_id_$tape_target_match)
-	    target=$(eval echo \$tape_target_$tape_target_match)
-	    #fs_options=$(eval echo \$fs_options_$tape_target_match | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
-	    tape_selected=$tape_target_match
-	    break
-	fi
-	if [ "$tape_id_match_count" -gt 1 ]; then
-	    # got LTFS ID selection from commandline
-	    tape_count=$tape_id_match_count
-	    if [ $verbose -ge 2 ]; then
-		printf "%s mount points were found with ID '%s'.\n" "$tape_id_match_count" "$uuid_cmdline"
-	    fi
-	    for tape_id in $tape_id_match; do
-		# Pseudo-Array: tape_selected_$i (reference to $tape_uuid element)
-		eval "tape_selected_$i='$tape_id'"
-		tape=$(eval echo \$tape_id_$tape_id)
-		tape_fs_options=$(eval echo \$fs_options_$tape_id | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
-		printf "%4s) %s (id=%s,%s)\n" "$i" "$target" "$tape" "$tape_fs_options"
-		i=$((i+1))
-	    done
-	else
-	    while [ "$tape_id" -le $tape_count ]; do
-		# present all mounted BTRFS filesystems
-		# Pseudo-Array: tape_selected_$i (reference to $tape_id element)
-		eval "tape_selected_$i='$tape_id'"
-		tape=$(eval echo \$tape_id_$tape_id)
-		target=$(eval echo \$tape_target_$tape_id)
-		#tape_fs_options=$(eval echo \$target_fs_options_$tape_id | sed -e 's/.*,\(subvolid=[0-9]*\).*,\(subvol=[0-9]*\)/\1,\2/')
-		printf "%4s) %s\n" "$i" "$target"
-		i=$((i+1))
-		tape_id=$(($tape_id+1))
-	    done
-	fi
-	printf "%4s) Exit\n" "x"
-	read -r -p "Enter a number: " tape_selected
-	case $tape_selected in
-	    x)
-		break
-		;;
-	    [0-9][0-9]|[0-9])
-		if [ "$tape_selected" -gt "$tape_count" ]; then
-		    tape_id=0
-		    i=0
-		else
-		    break
-		fi
-		;;
-	    *)
-		printf "\nNo LTFS tape selected. Select a tape to continue.\n"
-		tape_id=0
-		i=0
-		;;
-	esac
-    done
-    if [ "$tape_selected" = x ]; then
-        exit 0
-    fi
-
-    selected_tape_id=$(eval echo \$tape_id_$tape_selected)
-    selected_tape_target=$(eval echo \$tape_target_$tape_selected)
-    #selected_subvol=$(eval echo \$fs_options_$tape_selected | sed -e 's/.*subvolid=\([0-9]*\).*/\1/')
-
-    if [ $verbose -ge 2 ]; then
-	printf "${MAGENTA}You selected the LTFS tape with ID ${GREEN}'%s'${MAGENTA}${NO_COLOR}.\n" \
-	       "$selected_tape_id"
-	if [ -z "$remote" ]; then
-	    printf "${MAGENTA}Target tape is mounted at ${GREEN}'%s'${MAGENTA}.${NO_COLOR}\n" \
-		   "$selected_tape_target"
-	else
-	    printf "${MAGENTA}Target tape is mounted on host ${GREEN}'%s'${MAGENTA} at ${GREEN}'%s'${MAGENTA}.${NO_COLOR}\n" \
-		   "$remote" "$selected_tape_target"
-	fi
-    fi
-
-    if [ $donotify -gt 0 ]; then
-	if [ "$target_cmdline" != "none" ]; then
-	    if [ -z "$remote" ]; then
-		notify_info "Target selected" "Using target '$target_cmdline'..."
-	    else
-		notify_info "Target selected" "Using target '$target_cmdline' at '$remote'..."
-	    fi
-	elif [ "$tape_id_cmdline" != "none" ]; then
-	    if [ -z "$remote" ]; then
-		notify_info "LTFS Target selected" "Using LTFS targets '$tape_id_cmdline'..."
-	    else
-		notify_info "LTFS Target selected" "Using LTFS targets uuid '$tape_id_cmdline' at '$remote'..."
-	    fi
-	else
-	    if [ -z "$remote" ]; then
-		notify_info "Target selected" "Use command line menu to select target disk..."
-	    else
-		notify_info "Target selected" "Use command line menu to select target disk on $remote..."
-	    fi
-	fi
-    fi
-}
 
 set_config(){
     local config=${1:-/etc/snapper/config-templates/"$snapper_subvolume_template"}
@@ -2690,7 +2481,6 @@ Options:
                              (e.g. -c "root" -c "home"; --config root --config home)
      --config-postfix <name> Specify a postfix that will be appended to the destination snapper config name
      --dry-run               perform a trial run (no changes are written)
-     --mediapool             Specify the name of the tape MediaPool
      --mode                  Force backup mode <full>
  -n, --noconfirm             Do not ask for confirmation for each configuration. Will still prompt for backup
      --nonotify              Disable graphical notification (via dbus)
@@ -2706,7 +2496,6 @@ Options:
  -u, --uuid <UUID>           Specify the UUID of the mounted BTRFS subvolume to back up to. Otherwise will prompt
                              If multiple mount points are found with the same UUID, will prompt user selection
  -t, --target <target>       Specify the mountpoint of the backup device
-     --volumename            Specify the name of the tape volume
  -v, --verbose               Be verbose on what's going on (min: --verbose=1, max: --verbose=3)
      --version		     show program version
 EOF
@@ -3138,7 +2927,7 @@ check_prerequisites
 parse_params $@
 
 # parse infos for backup medium
-get_media_infos
+get_disk_infos
 
 # select the backup target
 select_target
