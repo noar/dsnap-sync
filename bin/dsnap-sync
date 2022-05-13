@@ -593,90 +593,6 @@ get_disk_infos () {
     done
 }
 
-: <<'notapesupport'
-get_tape_infos () {
-    local tape_id
-    local tape_target
-    local tape_fs_option
-
-    if [ $verbose -ge 3 ]; then
-	printf "${BLUE}get_tape_infos()...${NO_COLOR}\n"
-    fi
-
-    # get infos from mounted LTFS tapes
-    if [ -z $remote ]; then
-	# on localhost
-	if [ "$(findmnt --noheadings --nofsroot --types fuse --output SOURCE | awk -F ':' '{print $1}')" = "ltfs" ]; then
-	    tape_ids=$(findmnt --noheadings --nofsroot --types fuse --output SOURCE --list \
-			  | awk -F ':' '{print $2}')
-	    tape_targets=$(findmnt --noheadings --nofsroot --types fuse --output TARGET --list \
-			   | awk '{print $1}')
-	    fs_options=$(findmnt --noheadings --nofsroot --types fuse --output SOURCE,OPTIONS --list \
-			 | awk '{print $2}')
-	fi
-    else
-	# on remote host
-	if [ "$($ssh findmnt --noheadings --nofsroot --types fuse --output SOURCE --list | awk -F ':' '{print $1}')" = "ltfs" ]; then
-	    tape_ids=$($ssh findmnt --noheadings --nofsroot --types fuse --output SOURCE --list \
-			  | awk -F ':' '{print $2}')
-	    tape_targets=$($ssh findmnt --noheadings --nofsroot --types fuse --output TARGET --list \
-			   | awk '{print $1}')
-	    fs_options=$($ssh findmnt --noheadings --nofsroot --types fuse --output SOURCE,OPTIONS --list \
-			 | awk '{print $2}')
-	fi
-    fi
-
-    # we need at least one target disk
-    if [ ${#tape_targets} -eq 0 ]; then
-	printf "${RED}Error: ${MAGENTA}No suitable LTFS tape mounted yet${NO_COLOR}\n"
-	return 1
-    fi
-
-    # Posix Shells do not support Array. Therefore using ...
-    # Pseudo-Arrays (assumption: equal number of members)
-    # Pseudo-Array: tape_id_$i
-    # Pseudo-Array: tape_target_$i
-    # Pseudo-Array: fs_options_$i
-    # Pseudo-Array: fs_type_$i
-    # Pseudo-Array: tape_selected_$i (reference to $i element)
-    # List: tape_id_match (reference to matching preselected uuids)
-    # List: tape_target_match (reference to matching preselected targets)
-
-    # initialize our structures
-    #i=0
-    y=$(($target_count+1))
-    i=$y
-    for tape_id in $tape_ids; do
-	if [ "$tape_id" = "$tapeid_cmdline" ]; then
-	    if [ ${#tape_id_match} -gt 0 ]; then
-		tape_id_match="${tape_id_match} $i"
-	    else
-		tape_id_match="$i"
-	    fi
-	    tape_id_match_count=$(($tape_id_match_count+1))
-	fi
-	eval "tape_id_$i='$tape_id'"
-	eval "fs_type_$i='ltfs'"
-	target_count=$(($target_count+1))
-	i=$((i+1))
-    done
-    i=$y
-    for tape_target in $tape_targets; do
-	if [ "$tape_target" = "$target_cmdline" ]; then
-	    target_match="$i"
-	    target_match_count=$(($target_match_count+1))
-	fi
-	eval "target_$i='$tape_target'"
-	i=$((i+1))
-    done
-    #i=0
-    i=$y
-    for fs_option in $fs_options; do
-	eval "fs_options_$i='$fs_option'"
-	i=$((i+1))
-    done
-}
-notapesupport
 
 get_snapper_last_sync_id () {
     local snapper_config=${1#snapper_config=}
@@ -1046,7 +962,6 @@ parse_params () {
 		    break
 		fi
 		;;
-#Checkwhyduplicate
 	    --mode=*)
 		backup_mode=${1#*=}
 		shift
@@ -1153,10 +1068,6 @@ parse_params () {
 	printf "for backup-target:\n"
 	printf "  disk UUID:        '%s'\n" "$uuid_cmdline"
 	printf "  disk SUBVOLID:    '%s'\n" "$subvolid_cmdline"
-: <<'notapesupport'
-	printf "  tape MediaPool:   '%s'\n" "$mediapool_name"
-	printf "  tape VolumeName:  '%s'\n" "$volume_name"
-notapesupport
 	printf "  TARGET name:      '%s'\n" "$target_cmdline"
 	printf "  Backupdir:        '%s'\n" "$backupdir_cmdline"
 	printf "  Backup Type:      '%s'\n" "$backuptype_cmdline"
