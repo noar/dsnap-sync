@@ -67,13 +67,13 @@ disk_uuid_match=''
 error_count=0
 target_count=0
 target_match_count=0
-tape_match=''
 interactive=1
 selected_configs=0
 selected_subvol='none'
 selected_target='none'
 selected_uuid='none'
 snapper_sync_id=0
+snapper_source_id=-1 # FIXME ok? to happen in dry runs only
 snapper_snapshots=".snapshots"   # hardcoded in snapper
 snapper_snapshot_name="snapshot" # hardcoded in snapper
 snapper_subvolume_template="dsnap-sync"
@@ -186,6 +186,7 @@ create_snapshot () {
 					--description "$snap_description_running" \
 					--userdata "host=$remote")
 	fi
+	echo bahhhhhhhhhh $ret
 	if [ "$ret" ]; then
 	    snapper_source_id=$ret
 	else
@@ -200,8 +201,11 @@ create_snapshot () {
 	fi
 	snapper_source_snapshot=$SUBVOLUME/.snapshots/$snapper_source_id/$snapper_snapshot_name
 	snapper_source_info=$SUBVOLUME/.snapshots/$snapper_source_id/info.xml
-
+	# IMO quota enabling must be done outside this script, or at least loudly warn.
+	# tobechecked: silently ignore quotas unless explicitely asked for (FIXME where?), in which case,
+	# if not enabled, error out and instruct to enable quota.
 	#btrfs quota enable $snapper_source_snapshot
+	
 	sync
 
 	if [ $verbose -ge 3 ]; then
@@ -1403,7 +1407,8 @@ run_backup () {
 	case $snapper_backup_type in
 	    btrfs-snapshot)
 		create_snapshot
-		if [ $snapper_source_id -lt 0 ]; then
+		# tobechecked this errors and continue on dry run as source_id not set, FIXME initializing to -1 at top errors and stops 
+		if [ $dryrun -eq 0 ] && [ $snapper_source_id -lt 0 ] ; then
 		    return 1
 		fi
 
@@ -2359,9 +2364,9 @@ set_config(){
 traperror () {
     printf "Exited due to error on line %s.\n" $1
     printf "exit status: %s\n" "$2"
-    #printf "command: %s\n" "$3"
-    #printf "bash line: %s\n" "$4"
-    #printf "function name: %s\n" "$5"
+    printf "command: %s\n" "$3"
+    printf "bash line: %s\n" "$4"
+    printf "function name: %s\n" "$5"
     exit 1
 }
 
@@ -2829,7 +2834,8 @@ cwd=`pwd`
 ssh=""
 
 # can't be ported to dash (ERR is not supported)
-#trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
+# tobechecked Retried this but errors when trapkill doesn t, eg on dry run FIXMEsrcid (using bash as sh or not at top)
+trap 'traperror ${LINENO} $? "$BASH_COMMAND" $BASH_LINENO "${FUNCNAME[@]}"' ERR
 trap trapkill TERM INT
 
 check_prerequisites
