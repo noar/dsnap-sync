@@ -1,17 +1,36 @@
-# Maintainer: Ralf Zerres <ralf.zerres.de at gmail dot com>
-pkgname=dsnap-sync
-pkgver=0.6.6
+# Maintainer: noar <spadrolelavie cat gmail dog com>
+# forked from dsnap-sync by Ralf Zerres <ralf.zerres.de at gmail dot com>
+pkgname=snap-back-git
+_pkgname=snap-back
+pkgver=0.6.7
 pkgrel=1
-pkgdesc="Use snapper snapshots to backup to external drive"
+pkgdesc="Mirror btrfs trees on any or remote fs, using snapper snapshots/config"
 arch=(any)
-url="https://github.com/rzerres/dsnap-sync"
+url="https://github.com/noar/snap-back"
 license=('GPL')
-depends=('btrfs-progs' 'gawk' 'dash' 'openssh' 'sed' 'snapper' 'systemd')
-optdepends=('attr' 'ionice' 'jq: for "MediaPool" functionality' 'libnotify' 'ltfs' 'mtx' 'perl' 'pv' 'util-linux')
-source=(${url}/releases/download/$pkgver/$pkgname-$pkgver.tar.gz{,.sig})
-#validpgpkeys=('8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3')
+backup="etc/snapper/config-templates/snap-back"
+makedepends=('git')
+depends=('btrfs-progs' 'which' 'gawk' 'sed' 'snapper')
+optdepends=('pv: progress bar during backup'
+	    'libnotify: desktop notifications'
+	    'openssh: sending snapshots to remote hosts'
+	    'mbuffer: for buffering data streams'
+	    'ionice: io scheduling class and priority'
+	    'ltfs: for tape support (filesystem)'
+	    'mtx: for tape support (media changer)' 
+	    'jq: for tape support ("MediaPool" functionality)'
+	    'attr: for tape volume name only (for now)')
+#tobechecked ('dash' 'perl' 'systemd' 'util-linux')
+#source=(${url}/releases/download/$pkgver/$pkgname-$pkgver.tar.gz{,.sig})
+source=(git+$(echo $url).git)
+#validpgpkeys=('391BC244E24F20CE86E5779C8F7B6F930998B5B7')
 sha512sums=('SKIP')
-	    'SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  # cutting off 'v' prefix that presents in the git tag
+  git describe --long | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+}
 
 package() {
     cd $pkgname
