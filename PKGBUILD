@@ -2,13 +2,15 @@
 # forked from dsnap-sync by Ralf Zerres <ralf.zerres.de at gmail dot com>
 pkgname=snap-back-git
 _pkgname=snap-back
-pkgver=0.6.7
+pkgver=0.6.3.r85.ga275e07
 pkgrel=1
 pkgdesc="Mirror btrfs trees on any or remote fs, using snapper snapshots/config"
 arch=(any)
 url="https://github.com/noar/snap-back"
 license=('GPL')
-backup="etc/snapper/config-templates/snap-back"
+conflicts=('snap-back')
+provides=('snap-back')
+backup=('etc/snapper/config-templates/snap-back')
 makedepends=('git')
 depends=('btrfs-progs' 'which' 'gawk' 'sed' 'snapper')
 optdepends=('pv: progress bar during backup'
@@ -27,12 +29,12 @@ source=(git+$(echo $url).git)
 sha512sums=('SKIP')
 
 pkgver() {
-  cd "$pkgname"
+  cd "$_pkgname"
   # cutting off 'v' prefix that presents in the git tag
   git describe --long | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
 }
 
 package() {
-    cd $pkgname
+    cd $_pkgname
     make SNAPPER_CONFIG=/etc/conf.d/snapper DESTDIR=$pkgdir install
 }
