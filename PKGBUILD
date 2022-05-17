@@ -2,7 +2,7 @@
 # forked from dsnap-sync by Ralf Zerres <ralf.zerres.de at gmail dot com>
 pkgname=snap-back-git
 _pkgname=snap-back
-pkgver=0.6.3.r85.ga275e07
+pkgver=0.6.7
 pkgrel=1
 pkgdesc="Mirror btrfs trees on any or remote fs, using snapper snapshots/config"
 arch=(any)
@@ -24,7 +24,8 @@ optdepends=('pv: progress bar during backup'
 	    'attr: for tape volume name only (for now)')
 #tobechecked ('dash' 'perl' 'systemd' 'util-linux')
 #source=(${url}/releases/download/$pkgver/$pkgname-$pkgver.tar.gz{,.sig})
-source=(git+$(echo $url).git)
+#source=(git+$(echo $url).git)
+source=("$_pkgname::git+https://github.com/noar/$_pkgname.git")
 #validpgpkeys=('391BC244E24F20CE86E5779C8F7B6F930998B5B7')
 sha512sums=('SKIP')
 
